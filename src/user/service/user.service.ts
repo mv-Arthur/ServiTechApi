@@ -438,6 +438,18 @@ export class UserService {
 		return fileName;
 	}
 
+	async getPersonalById(id: number) {
+		const user = await this.personalRepository.findOne({
+			where: {
+				userId: id,
+			},
+		});
+
+		if (!user) throw new HttpException("пользователь не найден", HttpStatus.BAD_REQUEST);
+
+		return user;
+	}
+
 	async getOrg(id: number) {
 		const org = await this.organisationRepository.findOne({ where: { id } });
 		if (!org) throw new HttpException("данные не найдены", HttpStatus.BAD_REQUEST);

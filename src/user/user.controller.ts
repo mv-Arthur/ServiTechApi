@@ -56,15 +56,6 @@ export class UserController {
 		private botService: BotService
 	) {}
 
-	_ = (async () =>
-		await this.userService.setOrganization({
-			email: "bmt@gmail.com",
-			phoneNumber: "+7 962 570 10 58",
-			accNumber: "40702810680060657001",
-			address: "г. Бугугльма ул. Ленина д.122",
-			description: "Занимаемся предоставлением услуг в ИТ отделе",
-		}))();
-
 	@UsePipes(ValidationPipe)
 	@Post("/registration")
 	async registration(@Body() dto: RegistrationDto, @Res() res: Response) {
@@ -371,5 +362,10 @@ export class UserController {
 	async setAvatarOrg(@Body() dto: IdDto, @UploadedFile() file: Express.Multer.File) {
 		const result = await this.userService.setAvatarOrg(dto.id, file);
 		return result;
+	}
+
+	@Get("/personal/:id")
+	async getPersonalById(@Param("id") id: number) {
+		return await this.userService.getPersonalById(id);
 	}
 }
