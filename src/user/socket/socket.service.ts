@@ -253,7 +253,7 @@ export class SoketService implements OnGatewayConnection {
 		}
 	}
 
-	status: StatusType = "pending";
+	// status: StatusType = "pending";
 
 	@SubscribeMessage("start_counter")
 	async handleStartCounter(
@@ -265,7 +265,7 @@ export class SoketService implements OnGatewayConnection {
 			status: StatusType;
 		}
 	) {
-		this.status = payload.status;
+		// this.status = payload.status;
 		const order = await this.orderRepository.findOne({
 			where: { id: payload.orderId },
 			include: [Status, File],
@@ -293,12 +293,15 @@ export class SoketService implements OnGatewayConnection {
 		let secondsRemaining = hours * 3600 + minutes * 60 + seconds;
 		console.log(payload.status, "---------------------");
 
-		const interval = setInterval(() => {
+		const interval = setInterval(async () => {
 			if (secondsRemaining === 0) {
 				clearInterval(interval);
 			}
-
-			if (this.status !== "job") {
+			const order = await this.orderRepository.findOne({
+				where: { id: payload.orderId },
+				include: [Status],
+			});
+			if (order.status.status !== "job") {
 				clearInterval(interval);
 			}
 			console.log(payload.status);
