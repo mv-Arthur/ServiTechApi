@@ -82,10 +82,29 @@ export class SoketService implements OnGatewayConnection {
 		}
 
 		if (payload.status === "resolved") {
+			const operatorSettings = await this.operatorSettingsRepository.findOne({
+				where: { userId: operator.id },
+			});
+
+			const money = (Number(order.price) / 100) * operatorSettings.dealPercent;
+
+			operatorSettings.totalEarnings = operatorSettings.totalEarnings + money;
+			operatorSettings.save();
 			status.message = "Выполнен";
 		}
 
 		if (payload.status === "rejected") {
+			const operatorSettings = await this.operatorSettingsRepository.findOne({
+				where: { userId: operator.id },
+			});
+			if (operatorSettings.totalEarnings - operatorSettings.retentionRejection < 0) {
+				operatorSettings.totalEarnings = 0;
+				await operatorSettings.save();
+			} else {
+				operatorSettings.totalEarnings =
+					operatorSettings.totalEarnings - operatorSettings.retentionRejection;
+				await operatorSettings.save();
+			}
 			status.message = "Отклонен";
 		}
 
@@ -295,6 +314,19 @@ export class SoketService implements OnGatewayConnection {
 
 		const interval = setInterval(async () => {
 			if (secondsRemaining === 0) {
+				const operatorSettings = await this.operatorSettingsRepository.findOne({
+					where: { userId: operator.id },
+				});
+
+				if (operatorSettings.totalEarnings - operatorSettings.fineTardiness < 0) {
+					operatorSettings.totalEarnings = 0;
+					await operatorSettings.save();
+				} else {
+					operatorSettings.totalEarnings =
+						operatorSettings.totalEarnings - operatorSettings.fineTardiness;
+					await operatorSettings.save();
+				}
+
 				clearInterval(interval);
 			}
 			const order = await this.orderRepository.findOne({
@@ -322,7 +354,7 @@ export class SoketService implements OnGatewayConnection {
 			});
 
 			userMustRender.forEach((client) => {
-				client.emit("sstart_counter", {
+				client.emit("start_counter", {
 					orderId: order.id,
 					countvalue: str,
 				});
