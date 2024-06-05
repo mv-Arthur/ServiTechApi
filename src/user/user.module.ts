@@ -27,6 +27,9 @@ import { BotService } from "./service/bot.service";
 import { DateU } from "./model/dateU.model";
 import { Report } from "./model/report.model";
 import { Organization } from "./model/organisation.model";
+import { OperatorSettings } from "./model/operatorSettings.model";
+import { SoketService } from "./socket/socket.service";
+import { Chat } from "./model/chatItem.model";
 @Module({
 	controllers: [UserController],
 	providers: [
@@ -38,6 +41,7 @@ import { Organization } from "./model/organisation.model";
 		OrderService,
 		RoleGuard,
 		BotService,
+		SoketService,
 	],
 	imports: [
 		JwtModule.register({}),
@@ -56,6 +60,8 @@ import { Organization } from "./model/organisation.model";
 			DateU,
 			Report,
 			Organization,
+			OperatorSettings,
+			Chat,
 		]),
 		MulterModule.register({
 			dest: "./dist/user/uploads",

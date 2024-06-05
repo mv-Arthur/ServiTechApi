@@ -16,12 +16,18 @@ import { Vapid } from "../model/vapid.model";
 
 import { Subscription } from "../model/subscription.model";
 import { Keys } from "../model/keys.model";
-import { CreateTypeDto } from "../dto/createType.dto";
+import { CreateSettingsDto, CreateTypeDto, CreationTypeDto, TypeDto } from "../dto/createType.dto";
 import { Personal } from "../model/personal.model";
 import { PersonalDto } from "../dto/personalCreation.dto";
 import { Report } from "../model/report.model";
 import { DateU } from "../model/dateU.model";
 import { Sequelize } from "sequelize-typescript";
+import { AttachTypeDto } from "../dto/attachType.dto";
+
+import { OperatorSettings } from "../model/operatorSettings.model";
+import { SettingsDto, UserDtoForOperator } from "../dto/user.dto";
+import { Chat } from "../model/chatItem.model";
+
 @Injectable()
 export class OrderService {
 	constructor(
@@ -32,6 +38,8 @@ export class OrderService {
 		@InjectModel(Type) private typeRepository: typeof Type,
 		@InjectModel(Report) private reportRepository: typeof Report,
 		@InjectModel(DateU) private dateURepository: typeof DateU,
+		@InjectModel(OperatorSettings) private operatorSettingsRepository: typeof OperatorSettings,
+		@InjectModel(Chat) private chatRepository: typeof Chat,
 		private readonly sequelize: Sequelize
 	) {}
 
@@ -294,11 +302,24 @@ export class OrderService {
 	async deleteType(id: number) {
 		const type = await this.typeRepository.findOne({ where: { id } });
 		if (!type) throw new HttpException("типы не найдены", HttpStatus.BAD_REQUEST);
+		await this.unattachType(type.id);
 		const delCount = await this.typeRepository.destroy({ where: { id: type.id } });
+
+		const orders = await this.orderRepository.findAll({ include: [File] });
+		await Promise.all(
+			orders.map((order) => {
+				if (order.file.type === type.type) {
+					order.destroy();
+				}
+			})
+		);
+
 		if (!delCount) {
 			throw new HttpException("типы не найдены", HttpStatus.BAD_REQUEST);
 		}
+
 		return {
+			message: "успешно удален",
 			deletedTypeId: type.id,
 		};
 	}
@@ -337,6 +358,7 @@ export class OrderService {
 					model: Order,
 					include: [Status, File],
 				},
+				OperatorSettings,
 			],
 		});
 
@@ -347,8 +369,10 @@ export class OrderService {
 
 			return {
 				id: user.id,
+				typeId: user.typeId,
 				email: user.email,
 				role: user.role,
+				operatorSettings: user.operatorSettings,
 				personal: new PersonalDto(user.personal),
 				order: order.map((order) => {
 					const { status, file } = order;
@@ -472,5 +496,227 @@ export class OrderService {
 	async getRevenue() {
 		const rev = await this.dateURepository.findAll({ include: { all: true } });
 		return rev;
+	}
+
+	async acttachType(dto: AttachTypeDto) {
+		const { userId, typeId } = dto;
+
+		const user = await this.userRepository.findOne({ where: { id: userId } });
+
+		if (!user) throw new HttpException("пользователь не найден", HttpStatus.BAD_REQUEST);
+
+		const type = await this.typeRepository.findOne({
+			where: { id: typeId },
+			include: { model: User },
+		});
+
+		if (!type) throw new HttpException("тип не найден", HttpStatus.BAD_REQUEST);
+
+		if (type.operator && type.operator.id) {
+			throw new HttpException("оператор уже закреплен за этим типом", HttpStatus.BAD_REQUEST);
+		}
+
+		if (user.typeId) {
+			const attachedType = await this.typeRepository.findOne({ where: { id: user.typeId } });
+			throw new HttpException(
+				`оператор закреплен за другим типом: ${attachedType.name}`,
+				HttpStatus.BAD_REQUEST
+			);
+		}
+
+		user.typeId = type.id;
+		type.operator = user;
+		await user.save();
+		await type.save();
+
+		return {
+			typeId: type.id,
+			userId: user.id,
+		};
+	}
+
+	async unattachType(id: number) {
+		const type = await this.typeRepository.findOne({ where: { id }, include: { model: User } });
+		// console.log(type);
+		if (!type) throw new HttpException("тип не найден", HttpStatus.BAD_REQUEST);
+
+		const user = await this.userRepository.findOne({ where: { id: type.operator.id } });
+
+		if (!user) throw new HttpException("оператор не найден", HttpStatus.BAD_REQUEST);
+
+		type.operator = null;
+		await type.save();
+
+		user.typeId = null;
+		await user.save();
+
+		return {
+			message: "оператор успешно откреплен",
+			id: type.id,
+		};
+	}
+
+	async updateType(id: number, dto: TypeDto) {
+		const type = await this.typeRepository.findOne({ where: { id } });
+
+		if (!type) throw new HttpException("тип не найден", HttpStatus.BAD_REQUEST);
+		await type.update({ ...dto });
+
+		const requestedData = new CreationTypeDto(type);
+
+		return { message: "данные успешно обновлены", id: type.id, requestedData };
+	}
+
+	async updateTypePicture(id: number, file: Express.Multer.File) {
+		const extention = this.getExtension(file.originalname);
+
+		const fileName = uuidv4() + `.${extention}`;
+
+		const filePath = join(__dirname, "..", "uploads", fileName);
+		if (extention) {
+			rename(file.path, filePath, (err) => {
+				if (err) {
+					console.error(err);
+					throw new HttpException("ошибка при чтении файла", HttpStatus.BAD_REQUEST);
+				}
+				console.log(`переименован успешно`);
+			});
+		}
+
+		const type = await this.typeRepository.findOne({ where: { id } });
+
+		type.fileName = fileName;
+		await type.save();
+
+		return {
+			message: "изображение успешно изменено",
+			id: type.id,
+			fileName,
+		};
+	}
+
+	//require userId in param "id"
+	async setTypesSetting(dto: CreateSettingsDto) {
+		const operator = await this.userRepository.findOne({
+			where: { id: dto.userId },
+			include: [OperatorSettings],
+		});
+
+		if (operator.operatorSettings)
+			throw new HttpException("настройки уже заложены", HttpStatus.BAD_REQUEST);
+
+		if (!operator) throw new HttpException("не найден", HttpStatus.BAD_REQUEST);
+
+		if (operator.role !== "operator")
+			throw new HttpException("пользователь не подходящий роли", HttpStatus.BAD_REQUEST);
+
+		const operatorSettings = await this.operatorSettingsRepository.create(dto);
+
+		return {
+			message: "Настройки успешно добавлены",
+			operatorSettings,
+		};
+	}
+
+	async updateTyepsSettings(dto: CreateSettingsDto) {
+		const operator = await this.userRepository.findOne({
+			where: { id: dto.userId },
+			include: [OperatorSettings],
+		});
+		if (!operator) throw new HttpException("оператор не найден", HttpStatus.BAD_REQUEST);
+
+		if (!operator.operatorSettings)
+			throw new HttpException("настройки не заложены", HttpStatus.BAD_REQUEST);
+
+		await operator.operatorSettings.update({ ...dto });
+		await operator.operatorSettings.save();
+
+		return {
+			message: "настройки успешно обновлены",
+			operatorSettings: operator.operatorSettings,
+		};
+	}
+
+	async getOrdersForOperator(userId: number, role: "operator" | "user") {
+		if (role === "operator") {
+			const operator = await this.userRepository.findOne({
+				where: { id: userId },
+				include: [Personal, OperatorSettings],
+			});
+			if (!operator) throw new HttpException("оператор не найден", HttpStatus.BAD_REQUEST);
+			const type = await this.typeRepository.findOne({ where: { id: operator.typeId } });
+			if (!type)
+				throw new HttpException("тип не закреплен за оператором", HttpStatus.BAD_REQUEST);
+
+			const orders = await this.orderRepository.findAll({ include: [File, Status, Chat] });
+
+			const filteredOrdersByType = orders.filter((order) => {
+				return order.file.type === type.type;
+			});
+
+			const ordersWithType = await Promise.all(
+				filteredOrdersByType.map(async (order) => {
+					const type = await this.typeRepository.findOne({ where: { type: order.file.type } });
+					const customer = await this.userRepository.findOne({
+						where: { id: order.userId },
+						include: [Personal],
+					});
+					return {
+						order: order,
+						file: order.file,
+						type: type,
+						status: order.status,
+						customer,
+						chat: order.chat,
+					};
+				})
+			);
+
+			const ordersForResponse = ordersWithType.map((order) => {
+				return {
+					operator: new UserDtoForOperator(operator, operator.personal),
+					customer: new UserDtoForOperator(order.customer, order.customer.personal),
+					...new OrderDto(order.order, order.status, order.file, order.type),
+					chat: order.chat,
+					operatorSettings: new SettingsDto(operator.operatorSettings),
+				};
+			});
+
+			return ordersForResponse;
+		}
+
+		if (role === "user") {
+			const user = await this.userRepository.findOne({
+				where: { id: userId },
+				include: [Personal],
+			});
+
+			const ordersForUser = await this.orderRepository.findAll({
+				where: { userId: user.id },
+				include: [File, Status, Chat],
+			});
+
+			const ordersForResponse = await Promise.all(
+				ordersForUser.map(async (order) => {
+					const orderType = await this.typeRepository.findOne({
+						where: { type: order.file.type },
+					});
+					const operator = await this.userRepository.findOne({
+						where: { typeId: orderType.id },
+						include: [Personal, OperatorSettings],
+					});
+
+					return {
+						operator: new UserDtoForOperator(operator, operator.personal),
+						customer: new UserDtoForOperator(user, user.personal),
+						...new OrderDto(order, order.status, order.file, orderType),
+						chat: order.chat,
+						operatorSettings: new SettingsDto(operator.operatorSettings),
+					};
+				})
+			);
+
+			return ordersForResponse;
+		}
 	}
 }

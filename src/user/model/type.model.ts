@@ -1,4 +1,5 @@
-import { Column, DataType, Table, Model, ForeignKey, BelongsToMany } from "sequelize-typescript";
+import { Column, DataType, Table, Model, HasOne } from "sequelize-typescript";
+import { User } from "./user.model";
 
 interface CreationAttrs {
 	name: string;
@@ -10,6 +11,13 @@ interface CreationAttrs {
 
 @Table({ tableName: "type", timestamps: false })
 export class Type extends Model<Type, CreationAttrs> {
+	@Column({
+		type: DataType.INTEGER,
+		unique: true,
+		autoIncrement: true,
+		primaryKey: true,
+	})
+	id: number;
 	@Column({ type: DataType.STRING, allowNull: false })
 	name: string;
 	@Column({ type: DataType.STRING, allowNull: false, unique: true })
@@ -20,4 +28,6 @@ export class Type extends Model<Type, CreationAttrs> {
 	description: string;
 	@Column({ type: DataType.STRING, allowNull: false, unique: false })
 	minPrice: string;
+	@HasOne(() => User)
+	operator: User;
 }

@@ -14,6 +14,8 @@ import {
 	Patch,
 	HttpException,
 	Delete,
+	Put,
+	Query,
 } from "@nestjs/common";
 import { Response, Request } from "express";
 import { UserService } from "./service/user.service";
@@ -27,7 +29,7 @@ import { RoleGuard } from "./role.guard";
 import { SetPriceDto } from "./dto/setPrice.dto";
 import { SetStatusDto } from "./dto/setStatus.dto";
 import { updateDescriptionDto } from "./dto/updateDescription.dto";
-import { CreateTypeDto } from "./dto/createType.dto";
+import { CreateSettingsDto, CreateTypeDto, TypeDto } from "./dto/createType.dto";
 import {
 	AvatarDto,
 	nameDto,
@@ -39,6 +41,7 @@ import { BotService } from "./service/bot.service";
 import { SwtichRoleDto } from "./dto/switchRole.dto";
 import { MailToResetDto, ResetDto } from "./dto/reset.dto";
 import { ExtendedOrgDto, IdDto, OrganizationDto } from "./dto/organization.dto";
+import { AttachTypeDto } from "./dto/attachType.dto";
 
 export interface PushSubscription {
 	endpoint: string;
@@ -161,7 +164,7 @@ export class UserController {
 		try {
 			const { refreshToken } = req.cookies;
 			const userData = await this.userService.refresh(refreshToken);
-			res.cookie(userData.refreshToken, {
+			res.cookie("refreshToken", userData.refreshToken, {
 				maxAge: 30 * 24 * 60 * 60 * 1000,
 				httpOnly: true,
 			});
@@ -367,5 +370,44 @@ export class UserController {
 	@Get("/personal/:id")
 	async getPersonalById(@Param("id") id: number) {
 		return await this.userService.getPersonalById(id);
+	}
+
+	@Post("/attachType")
+	async acttachType(@Body() dto: AttachTypeDto) {
+		return await this.orderService.acttachType(dto);
+	}
+
+	@Delete("/attachType/:id")
+	async unattachType(@Param("id") id: number) {
+		return await this.orderService.unattachType(id);
+		// console.log(id);
+	}
+
+	@Patch("/types/:id")
+	async updateType(@Param("id") id: number, @Body() dto: TypeDto) {
+		return await this.orderService.updateType(id, dto);
+	}
+
+	@Patch("/typesPciture/:id")
+	@UseInterceptors(FileInterceptor("file"))
+	async updateTypePicture(@Param("id") id: number, @UploadedFile() file: Express.Multer.File) {
+		return await this.orderService.updateTypePicture(id, file);
+	}
+
+	@Post("/types/setting")
+	async setTypesSetting(@Body() dto: CreateSettingsDto) {
+		return await this.orderService.setTypesSetting(dto);
+	}
+
+	@Patch("/typesSettings")
+	async updateTypesSettings(@Body() dto: CreateSettingsDto) {
+		return await this.orderService.updateTyepsSettings(dto);
+	}
+
+	@Get("/orders")
+	async getOrdersForOperator(@Query() query: { userId?: number; role?: "operator" | "user" }) {
+		const { userId, role } = query;
+
+		return await this.orderService.getOrdersForOperator(userId, role);
 	}
 }

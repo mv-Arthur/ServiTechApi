@@ -5,6 +5,8 @@ import { Order } from "./order.model";
 import { Vapid } from "./vapid.model";
 import { Subscription } from "./subscription.model";
 import { Personal } from "./personal.model";
+import { Type } from "./type.model";
+import { OperatorSettings } from "./operatorSettings.model";
 
 interface CreationAttrs {
 	email: string;
@@ -34,8 +36,6 @@ export class User extends Model<User, CreationAttrs> {
 	activationLinkAdmin: string;
 	@Column({ type: DataType.STRING, unique: false })
 	resetLink: string;
-	@Column({ type: DataType.STRING, defaultValue: "" })
-	type: string;
 	@Column({ type: DataType.STRING, defaultValue: "user" })
 	role: RoleType;
 	@HasOne(() => Token)
@@ -48,4 +48,10 @@ export class User extends Model<User, CreationAttrs> {
 	subscription: Subscription;
 	@HasOne(() => Personal)
 	personal: Personal;
+	@ForeignKey(() => Type)
+	@Column({ type: DataType.INTEGER })
+	typeId: number;
+
+	@HasOne(() => OperatorSettings)
+	operatorSettings: OperatorSettings;
 }

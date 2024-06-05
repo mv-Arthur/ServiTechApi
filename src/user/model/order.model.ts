@@ -1,8 +1,9 @@
-import { Column, DataType, Table, Model, ForeignKey, HasOne } from "sequelize-typescript";
+import { Column, DataType, Table, Model, ForeignKey, HasOne, HasMany } from "sequelize-typescript";
 import { User } from "./user.model";
 
 import { Status } from "./status.model";
 import { File } from "./file.model";
+import { Chat } from "./chatItem.model";
 
 interface CreationAttrs {
 	description: string;
@@ -27,6 +28,9 @@ export class Order extends Model<Order, CreationAttrs> {
 	status: Status;
 	@HasOne(() => File, { onDelete: "CASCADE" })
 	file: File;
+
+	@HasMany(() => Chat)
+	chat: Chat;
 	@ForeignKey(() => User)
 	@Column({ type: DataType.INTEGER })
 	userId: number;
