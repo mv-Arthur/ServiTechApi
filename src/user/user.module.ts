@@ -30,42 +30,45 @@ import { Organization } from "./model/organisation.model";
 import { OperatorSettings } from "./model/operatorSettings.model";
 import { SoketService } from "./socket/socket.service";
 import { Chat } from "./model/chatItem.model";
+import { OperatorReport } from "./model/operatorReport.model";
+
 @Module({
-	controllers: [UserController],
-	providers: [
-		ExpressAdapter,
-		UserService,
-		MailService,
-		TokenService,
-		JwtAuthGuard,
-		OrderService,
-		RoleGuard,
-		BotService,
-		SoketService,
-	],
-	imports: [
-		JwtModule.register({}),
-		ConfigModule,
-		SequelizeModule.forFeature([
-			User,
-			Token,
-			Order,
-			File,
-			Status,
-			Type,
-			Vapid,
-			Subscription,
-			Keys,
-			Personal,
-			DateU,
-			Report,
-			Organization,
-			OperatorSettings,
-			Chat,
-		]),
-		MulterModule.register({
-			dest: "./dist/user/uploads",
-		}),
-	],
+  controllers: [UserController],
+  providers: [
+    ExpressAdapter,
+    UserService,
+    MailService,
+    TokenService,
+    JwtAuthGuard,
+    OrderService,
+    RoleGuard,
+    BotService,
+    SoketService,
+  ],
+  imports: [
+    JwtModule.register({}),
+    ConfigModule,
+    SequelizeModule.forFeature([
+      User,
+      Token,
+      Order,
+      File,
+      Status,
+      Type,
+      Vapid,
+      Subscription,
+      Keys,
+      Personal,
+      DateU,
+      Report,
+      Organization,
+      OperatorSettings,
+      Chat,
+      OperatorReport,
+    ]),
+    MulterModule.register({
+      dest: "./dist/user/uploads",
+    }),
+  ],
 })
 export class UserModule {}
